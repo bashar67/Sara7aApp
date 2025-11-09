@@ -3,10 +3,11 @@ import userRouter from "./Modules/User/user.controller.js";
 import messageRouter from "./Modules/Message/message.controller.js";
 import connectDB from "./DB/connection.js";
 import { globalErrorHandler } from "./Utils/errorHandler.utils.js";
+import cors from "cors";
 
 const bootstrap = async (app, express) => {
   app.use(express.json());
-
+  app.use(cors());
   await connectDB();
 
   app.get("/", (req, res) => {

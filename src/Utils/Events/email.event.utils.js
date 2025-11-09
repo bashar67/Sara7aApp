@@ -9,7 +9,17 @@ eventEmitter.on("confirmEmail", async (data) => {
   await sendEmail({
     to: data.to,
     subject: subjectEmail.CONFIRM_EMAIL,
-    html: template(data.otp, data.firstName),
+    html: template(data.otp, data.firstName, subjectEmail.CONFIRM_EMAIL),
+  }).catch((err) => {
+    console.log(`Error in sending confirm email: ${err}`);
+  });
+});
+
+eventEmitter.on("forgetPassword", async (data) => {
+  await sendEmail({
+    to: data.to,
+    subject: subjectEmail.PASSWORD_RESET,
+    html: template(data.otp, data.firstName, subjectEmail.PASSWORD_RESET),
   }).catch((err) => {
     console.log(`Error in sending confirm email: ${err}`);
   });

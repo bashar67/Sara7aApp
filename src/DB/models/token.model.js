@@ -1,11 +1,11 @@
-import mongoose from "mongoose";
+import mongoose, { Schema } from "mongoose";
 
 const tokenSchema = new mongoose.Schema(
   {
     jwtid: { type: String, required: true, unique: true },
     expiresIn: { type: Date, required: true },
     userId: {
-      type: mongoose.Schema.Types.ObjectId,
+      type: Schema.Types.ObjectId,
       ref: "User",
       // required: true,
     },
@@ -13,6 +13,7 @@ const tokenSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-const TokenModel = mongoose.model.User || mongoose.model("Token", tokenSchema);
+const TokenModel =
+  mongoose.models.Token || mongoose.model("Token", tokenSchema);
 
 export default TokenModel;

@@ -11,11 +11,12 @@ import { verifyToken } from "../../Utils/Tokens/token.utils.js";
 export const getAllUsers = async (req, res, next) => {
   let users = await dbService.find({
     model: UserModel,
+    populate: [{ path: "messages", select: "content -_id -receiverId" }],
   });
 
-  users = users.map((user) => {
-    return { ...user._doc, phone: asymmetricDecrypt(user.phone) };
-  });
+  // users = users.map((user) => {
+  //   return { ...user._doc, phone: asymmetricDecrypt(user.phone) };
+  // });
 
   return successResponse({
     res,
@@ -44,5 +45,14 @@ export const updateUserProfile = async (req, res, next) => {
     statusCode: 200,
     message: "Users fetched successfully",
     data: { user },
+  });
+};
+
+export const profileImage = async (req, res, next) => {
+  return successResponse({
+    res,
+    statusCode: 200,
+    message: "image updated  successfully",
+    data: { file: req.file },
   });
 };
