@@ -1,5 +1,6 @@
 import joi from "joi";
 import { generalFields } from "../../Middlewares/validation.middleware.js";
+import { roleEnum } from "../../DB/models/user.model.js";
 
 export const signupSchema = {
   body: joi.object({
@@ -10,6 +11,10 @@ export const signupSchema = {
     confirmPassword: generalFields.confirmPassword,
     gender: generalFields.gender,
     phone: generalFields.phone,
+    role: joi
+      .string()
+      .valid(...Object.values(roleEnum))
+      .default(roleEnum.USER),
   }),
 };
 

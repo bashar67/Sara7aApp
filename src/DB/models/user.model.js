@@ -9,6 +9,11 @@ export const providerEnum = {
   GOOGLE: "GOOGLE",
 };
 
+export const roleEnum = {
+  USER: "USER",
+  ADMIN: "ADMIN",
+};
+
 const userSchema = new mongoose.Schema(
   {
     firstName: {
@@ -55,7 +60,41 @@ const userSchema = new mongoose.Schema(
       },
       default: providerEnum.SYSTEM,
     },
+    role: {
+      type: String,
+      enum: {
+        values: Object.values(roleEnum),
+        message: "{VALUE} is not valid role",
+      },
+      default: roleEnum.USER,
+    },
     phone: String,
+    profileImage: String,
+    coverImages: [String],
+    cloudProfileImage: { public_id: String, secure_url: String },
+    cloudCoverImages: [{ public_id: String, secure_url: String }],
+    // freezing fields
+    freezedAt: Date,
+    freezedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    restoredFromFreezedAt: Date,
+    restoredFromFreezedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+    // soft delete fields
+    isDeleted: { type: Boolean, default: false },
+    deletedAt: {
+      type: Date,
+      index: {
+        expireAfterSeconds: 60 * 60 * 24 * 30, // 30 days
+      },
+    },
+    deletedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    restoredFromDeletedAt: Date,
+    restoredFromDeletedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
     confirmEmail: Date,
     confirmEmailOTP: String,
     forgetPasswordOTP: { code: { type: String }, expiresAt: { type: Date } },

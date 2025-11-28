@@ -57,4 +57,15 @@ export const generalFields = {
   id: joi.string().custom((value, helper) => {
     return Types.ObjectId.isValid(value) || helper.message("Invalid ID format");
   }),
+  file: {
+    fieldname: joi.string(),
+    originalname: joi.string(),
+    encoding: joi.string(),
+    mimetype: joi.string(),
+    destination: joi.string(),
+    filename: joi.string(),
+    finalPath: joi.string(),
+    path: joi.string(),
+    size: joi.number().positive(),
+  },
 };

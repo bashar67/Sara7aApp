@@ -1,30 +1,37 @@
-import { verifyToken } from "../Utils/Tokens/token.utils.js";
+import { getSignature, verifyToken } from "../Utils/Tokens/token.utils.js";
 import * as dbService from "../DB/dbService.js";
 import TokenModel from "../DB/models/token.model.js";
 import UserModel from "../DB/models/user.model.js";
 
-export const authentication = async (req, res, next) => {
-  const { authorization } = req.headers;
+export const tokenTypeEnum = {
+  ACCESS: "ACCESS",
+  REFRESH: "REFRESH",
+};
 
-  if (!authorization) {
+const decodedToken = async ({
+  authorization,
+  tokenType = tokenTypeEnum.ACCESS,
+  next,
+} = {}) => {
+  const [Bearer, token] = authorization.split(" ") || [];
+  if (!Bearer & !token)
     return next(new Error("Authorization token is missing", { cause: 400 }));
-  }
-  if (!authorization.startsWith(process.env.TOKEN_PREFIX)) {
-    return next(new Error("Invalid authorization format", { cause: 400 }));
-  }
 
-  const token = authorization.split(" ")[1];
+  let signatures = await getSignature({ signatureLevel: Bearer });
 
-  const decodedToken = verifyToken({
+  const decoded = verifyToken({
     token,
-    secretKey: process.env.JWT_SECRET_KEY,
+    secretKey:
+      tokenType === tokenTypeEnum.ACCESS
+        ? signatures.accessSignature
+        : signatures.refreshSignature,
   });
-  if (!decodedToken.jti)
-    return next(new Error("Invalid token", { cause: 401 }));
+
+  if (!decoded.jti) return next(new Error("Invalid token", { cause: 401 }));
 
   const revokedToken = await dbService.findOne({
     model: TokenModel,
-    filter: { jwtid: decodedToken.jti },
+    filter: { jwtid: decoded.jti },
   });
   if (revokedToken)
     return next(
@@ -34,11 +41,28 @@ export const authentication = async (req, res, next) => {
   // find the user
   const user = await dbService.findById({
     model: UserModel,
-    id: decodedToken.id,
+    id: decoded.id,
   });
-  if (!user) return next(new Error("User not found", { cause: 404 }));
+  if (!user) return next(new Error("Not Registered Account ", { cause: 404 }));
+  return { user, decoded };
+};
 
-  req.user = user;
-  req.decodedToken = decodedToken;
-  next();
+export const authentication = ({ tokenType = tokenTypeEnum.ACCESS } = {}) => {
+  return async (req, res, next) => {
+    const { user, decoded } = await decodedToken(
+      { authorization: req.headers.authorization, tokenType, next } || {}
+    );
+    req.user = user;
+    req.decoded = decoded;
+    return next();
+  };
+};
+
+export const authorization = ({ accessRoles = [] } = {}) => {
+  return (req, res, next) => {
+    if (!accessRoles.includes(req.user.role)) {
+      return next(new Error("Forbidden access", { cause: 403 }));
+    }
+    return next();
+  };
 };

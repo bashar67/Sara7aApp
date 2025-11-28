@@ -66,3 +66,7 @@ export const findOneAndUpdate = async ({
 } = {}) => {
   return await model.findOneAndUpdate(filter, data, options);
 };
+
+export const deleteOne = async ({ model, filter = {} } = {}) => {
+  return await model.deleteOne(filter);
+};

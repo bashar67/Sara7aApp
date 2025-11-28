@@ -2,15 +2,11 @@ import UserModel, { providerEnum } from "../../DB/models/user.model.js";
 import TokenModel from "../../DB/models/token.model.js";
 import { successResponse } from "../../Utils/successResponse.utils.js";
 import * as dbService from "../../DB/dbService.js";
-import {
-  asymmetricEncrypt,
-  encrypt,
-} from "../../Utils/Encryption/encryption.utils.js";
+import { asymmetricEncrypt } from "../../Utils/Encryption/encryption.utils.js";
 import { compareHash, hash } from "../../Utils/Hashing/hashing.utils.js";
 import { eventEmitter } from "../../Utils/Events/email.event.utils.js";
 import { customAlphabet } from "nanoid";
-import { generateToken, verifyToken } from "../../Utils/Tokens/token.utils.js";
-import { v4 as uuid } from "uuid";
+import { getNewLoginCredentials } from "../../Utils/Tokens/token.utils.js";
 import { OAuth2Client } from "google-auth-library";
 
 export const signup = async (req, res, next) => {
@@ -19,7 +15,11 @@ export const signup = async (req, res, next) => {
   // check if user already exists
   const existingUser = await dbService.findOne({
     model: UserModel,
-    filter: { email },
+    filter: {
+      email,
+      deletedAt: { $exists: false },
+      freezedAt: { $exists: false },
+    },
   }); // null  or document(truthy value)
 
   if (existingUser)
@@ -60,7 +60,9 @@ export const login = async (req, res, next) => {
   // check if user already exists
   const existingUser = await dbService.findOne({
     model: UserModel,
-    filter: { email },
+    filter: {
+      email,
+    },
   });
 
   if (!existingUser) return next(new Error("User not exists", { cause: 404 }));
@@ -71,30 +73,30 @@ export const login = async (req, res, next) => {
 
   if (!existingUser.confirmEmail)
     return next(new Error("Please confirm your email first", { cause: 400 }));
+  if (existingUser.freezedAt)
+    return next(
+      new Error("Account is freezed Please unfreeze it or contact support", {
+        cause: 403,
+      })
+    );
+  if (existingUser.deletedAt)
+    return next(
+      new Error("This account is scheduled for deletion  ", { cause: 403 })
+    );
 
-  const accessToken = generateToken({
-    payload: { id: existingUser._id, email: existingUser.email },
-    secretKey: process.env.JWT_SECRET_KEY,
-    options: {
-      expiresIn: parseInt(process.env.JWT_EXPIRES_IN),
-      jwtid: uuid(), // use for revoke token
-    },
-  });
-
-  const refreshToken = generateToken({
-    payload: { id: existingUser._id, email: existingUser.email },
-    secretKey: process.env.JWT_REFRESH_KEY,
-    options: {
-      expiresIn: parseInt(process.env.REFRESH_JWT_EXPIRES_IN),
-      jwtid: uuid(), // use for revoke token
-    },
-  });
+  const credentials = await getNewLoginCredentials(existingUser);
+  const user = {
+    firstName: existingUser.firstName,
+    lastName: existingUser.lastName,
+    email: existingUser.email,
+    gender: existingUser.gender,
+  };
 
   return successResponse({
     res,
     statusCode: 200,
     message: "User LoggedIn successfully",
-    data: { accessToken, refreshToken },
+    data: { credentials, user },
   });
 };
 
@@ -107,6 +109,8 @@ export const confirmEmail = async (req, res, next) => {
     filter: {
       email,
       confirmEmail: { $exists: false },
+      deletedAt: { $exists: false },
+      freezedAt: { $exists: false },
       confirmEmailOTP: { $exists: true },
     },
   });
@@ -143,9 +147,9 @@ export const logout = async (req, res, next) => {
     model: TokenModel,
     data: [
       {
-        jwtid: req.decodedToken.jti,
-        expiresIn: new Date(req.decodedToken.exp * 1000),
-        // userId: req.decodedToken._id,
+        jwtid: req.decoded.jti,
+        expiresIn: new Date(req.decoded.exp * 1000),
+        userId: req.decoded._id,
       },
     ],
   });
@@ -158,22 +162,9 @@ export const logout = async (req, res, next) => {
 };
 
 export const refreshToken = async (req, res, next) => {
-  const { refreshtoken } = req.headers;
+  const user = req.user;
 
-  const decodedToken = verifyToken({
-    token: refreshtoken,
-    secretKey: process.env.JWT_REFRESH_KEY,
-  });
-
-  const accessToken = generateToken({
-    payload: { id: decodedToken.id, email: decodedToken.email },
-    secretKey: process.env.JWT_SECRET_KEY,
-    options: {
-      expiresIn: parseInt(process.env.JWT_EXPIRES_IN),
-      jwtid: uuid(),
-    },
-  });
-
+  const { accessToken } = await getNewLoginCredentials(user);
   return successResponse({
     res,
     statusCode: 200,
@@ -192,6 +183,8 @@ export const forgetPassword = async (req, res, next) => {
     filter: {
       email,
       confirmEmail: { $exists: true },
+      deletedAt: { $exists: false },
+      freezedAt: { $exists: false },
     },
     data: {
       forgetPasswordOTP: {
@@ -237,7 +230,11 @@ export const updatePassword = async (req, res, next) => {
 
   await dbService.updateOne({
     model: UserModel,
-    filter: { _id: user._id },
+    filter: {
+      _id: user._id,
+      deletedAt: { $exists: false },
+      freezedAt: { $exists: false },
+    },
     data: {
       password: await hash({ plainText: newPassword }),
       $inc: { __v: 1 },
@@ -259,6 +256,8 @@ export const resetPassword = async (req, res, next) => {
     filter: {
       email,
       confirmEmail: { $exists: true },
+      deletedAt: { $exists: false },
+      freezedAt: { $exists: false },
     },
   });
   if (!user)
@@ -325,31 +324,25 @@ export const loginWithGmail = async (req, res, next) => {
   }
 
   const user = await dbService.findOne({ model: UserModel, filter: { email } });
+  if (existingUser.freezedAt)
+    return next(
+      new Error("Account is freezed Please unfreeze it or contact support", {
+        cause: 403,
+      })
+    );
+  if (existingUser.deletedAt)
+    return next(
+      new Error("This account is scheduled for deletion  ", { cause: 403 })
+    );
   if (user) {
     if (user.providers === providerEnum.GOOGLE) {
-      const accessToken = generateToken({
-        payload: { id: user._id, email: user.email },
-        secretKey: process.env.JWT_SECRET_KEY,
-        options: {
-          expiresIn: parseInt(process.env.JWT_EXPIRES_IN),
-          jwtid: uuid(), // use for revoke token
-        },
-      });
-
-      const refreshToken = generateToken({
-        payload: { id: user._id, email: user.email },
-        secretKey: process.env.JWT_REFRESH_KEY,
-        options: {
-          expiresIn: parseInt(process.env.REFRESH_JWT_EXPIRES_IN),
-          jwtid: uuid(), // use for revoke token
-        },
-      });
+      const credentials = await getNewLoginCredentials(existingUser);
 
       return successResponse({
         res,
         statusCode: 200,
         message: "User LoggedIn successfully",
-        data: { accessToken, refreshToken },
+        data: { credentials },
       });
     }
   }
@@ -367,29 +360,12 @@ export const loginWithGmail = async (req, res, next) => {
       },
     ],
   });
-
-  const accessToken = generateToken({
-    payload: { id: newUser._id, email: newUser.email },
-    secretKey: process.env.JWT_SECRET_KEY,
-    options: {
-      expiresIn: parseInt(process.env.JWT_EXPIRES_IN),
-      jwtid: uuid(), // use for revoke token
-    },
-  });
-
-  const refreshToken = generateToken({
-    payload: { id: newUser._id, email: newUser.email },
-    secretKey: process.env.JWT_REFRESH_KEY,
-    options: {
-      expiresIn: parseInt(process.env.REFRESH_JWT_EXPIRES_IN),
-      jwtid: uuid(), // use for revoke token
-    },
-  });
+  const credentials = await getNewLoginCredentials(newUser);
 
   return successResponse({
     res,
     statusCode: 200,
     message: "Login  successfully",
-    data: { accessToken, refreshToken },
+    data: { credentials },
   });
 };
