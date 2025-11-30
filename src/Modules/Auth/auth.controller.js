@@ -42,8 +42,13 @@ router.patch(
 router.patch(
   "/update-password",
   validate(updatePasswordSchema),
-  authentication,
+  authentication({ tokenType: tokenTypeEnum.ACCESS }),
   authService.updatePassword
+);
+
+router.patch(
+  "/confirm-reset-password-otp",
+  authService.confirmResetPasswordOTP
 );
 
 router.patch(

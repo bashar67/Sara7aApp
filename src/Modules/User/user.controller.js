@@ -16,14 +16,18 @@ import {
   deleteAccountSchema,
   freezeAccountSchema,
   profileImageSchema,
-  restoreDeletedAccountSchema,
-  restoreFreezedAccountSchema,
 } from "./user.validation.js";
 import { cloudFileUploadMulter } from "../../Utils/multer/cloud.multer.js";
 import { roleEnum } from "../../DB/models/user.model.js";
 const router = Router();
 
 router.get("/", userService.getAllUsers);
+
+router.get(
+  "/profile",
+  authentication({ tokenType: tokenTypeEnum.ACCESS }),
+  userService.getUserProfile
+);
 
 router.patch(
   "/update",
@@ -34,14 +38,14 @@ router.patch(
 
 router.patch(
   "/profile-image",
-  authentication,
-  authorization({ accessRoles: ["ADMIN"] }),
+  authentication({ tokenType: tokenTypeEnum.ACCESS }),
+  // authorization({ accessRoles: ["USER"] }),
   // localUploadMulter({
   //   customPath: "User",
   // }).single("profileImages"),
   // validate(profileImageSchema),
   cloudFileUploadMulter({ validation: [...fileValidation.Images] }).single(
-    "profileImages"
+    "profileImage"
   ),
   //magic number validation
   fileSignatureValidation({ allowedTypes: [...fileValidation.Images] }),
@@ -50,7 +54,7 @@ router.patch(
 
 router.patch(
   "/cover-images",
-  authentication,
+  authentication({ tokenType: tokenTypeEnum.ACCESS }),
   // localUploadMulter({
   //   customPath: "User",
   // }).array("coverImages", 5),
@@ -76,10 +80,10 @@ router.patch(
 );
 
 router.patch(
-  "/:userId/restore-freezed-account",
+  "/restore-freezed-account",
   authentication({ tokenType: tokenTypeEnum.ACCESS }),
   authorization({ accessRoles: [roleEnum.ADMIN, roleEnum.USER] }),
-  validate(restoreFreezedAccountSchema),
+  // validate(restoreFreezedAccountSchema),
   userService.restoreFreezedAccount
 );
 
@@ -93,10 +97,10 @@ router.patch(
 );
 
 router.patch(
-  "/:userId/restore-deleted-account",
+  "/restore-deleted-account",
   authentication({ tokenType: tokenTypeEnum.ACCESS }),
   authorization({ accessRoles: [roleEnum.ADMIN, roleEnum.USER] }),
-  validate(restoreDeletedAccountSchema),
+  // validate(restoreDeletedAccountSchema),
   userService.restoreDeletedAccount
 );
 

@@ -14,17 +14,17 @@ const bootstrap = async (app, express) => {
   app.use(express.json());
   app.use(cors(corsOption())); // with social media frontend, we need to enable cors for cross-origin requests
   app.use(helmet());
-  app.use(
-    rateLimit({
-      windowMs: 5 * 60 * 1000, // 5 minutes
-      max: 35, // limit each IP to 10 requests per windowMs
-      message: {
-        status: 429,
-        message: "Too many requests, please try again later.",
-      },
-      legacyHeaders: false, // Disable the `X-RateLimit-*` headers
-    })
-  );
+  // app.use(
+  //   rateLimit({
+  //     windowMs: 5 * 60 * 1000, // 5 minutes
+  //     max: 35, // limit each IP to 10 requests per windowMs
+  //     message: {
+  //       status: 429,
+  //       message: "Too many requests, please try again later.",
+  //     },
+  //     legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+  //   })
+  // );
   await connectDB();
 
   attachRouterWithLogger(app, "/api/v1/auth", authRouter, "auth.log");

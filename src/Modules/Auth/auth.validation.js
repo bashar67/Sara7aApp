@@ -43,7 +43,6 @@ export const resetPasswordSchema = {
     email: generalFields.email.required(),
     password: generalFields.password.required(),
     confirmPassword: generalFields.confirmPassword,
-    otp: generalFields.otp.required(),
   }),
 };
 

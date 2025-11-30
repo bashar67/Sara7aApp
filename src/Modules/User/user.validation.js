@@ -46,11 +46,11 @@ export const freezeAccountSchema = {
   }),
 };
 
-export const restoreFreezedAccountSchema = {
-  params: joi.object({
-    userId: generalFields.id.required(),
-  }),
-};
+// export const restoreFreezedAccountSchema = {
+//   params: joi.object({
+//     userId: generalFields.id.required(),
+//   }),
+// };
 
 export const deleteAccountSchema = {
   params: joi.object({
@@ -58,8 +58,8 @@ export const deleteAccountSchema = {
   }),
 };
 
-export const restoreDeletedAccountSchema = {
-  params: joi.object({
-    userId: generalFields.id.required(),
-  }),
-};
+// export const restoreDeletedAccountSchema = {
+//   params: joi.object({
+//     userId: generalFields.id.required(),
+//   }),
+// };

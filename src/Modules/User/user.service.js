@@ -3,9 +3,11 @@ import UserModel, { roleEnum } from "../../DB/models/user.model.js";
 import {
   decrypt,
   asymmetricDecrypt,
+  asymmetricEncrypt,
 } from "../../Utils/Encryption/encryption.utils.js";
 import { successResponse } from "../../Utils/successResponse.utils.js";
 import { cloudinaryConfig } from "../../Utils/multer/cloudinary.config.js";
+import { compareHash } from "../../Utils/Hashing/hashing.utils.js";
 
 export const getAllUsers = async (req, res, next) => {
   let users = await dbService.find({
@@ -25,8 +27,37 @@ export const getAllUsers = async (req, res, next) => {
   });
 };
 
+export const getUserProfile = async (req, res, next) => {
+  const user = req.user;
+
+  const userProfile = await dbService.findOne({
+    model: UserModel,
+    filter: { _id: user._id },
+    select:
+      "firstName lastName email phone cloudProfileImage cloudCoverImages gender -_id",
+  });
+
+  const finalUserProfile = {
+    firstName: userProfile.firstName,
+    lastName: userProfile.lastName,
+    email: userProfile.email,
+    gender: userProfile.gender,
+    phone: asymmetricDecrypt(userProfile.phone),
+    cloudProfileImage: userProfile.cloudProfileImage.secure_url || null,
+    cloudCoverImages:
+      userProfile.cloudCoverImages.map((img) => img.secure_url) || [],
+  };
+
+  return successResponse({
+    res,
+    statusCode: 200,
+    message: "Users fetched successfully",
+    data: { userProfile: finalUserProfile },
+  });
+};
+
 export const updateUserProfile = async (req, res, next) => {
-  const { firstName, lastName, gender } = req.body;
+  const { firstName, lastName, gender, phone } = req.body;
 
   const user = await dbService.findByIdAndUpdate({
     model: UserModel,
@@ -35,6 +66,7 @@ export const updateUserProfile = async (req, res, next) => {
       firstName,
       lastName,
       gender,
+      phone: asymmetricEncrypt(phone),
       $inc: { __v: 1 },
     },
   });
@@ -79,6 +111,10 @@ export const profileImage = async (req, res, next) => {
 export const coverImages = async (req, res, next) => {
   const attachment = [];
 
+  if (!req.files || req.files.length === 0) {
+    return res.status(400).json({ message: "No files uploaded" });
+  }
+
   for (const file of req.files) {
     const { public_id, secure_url } = await cloudinaryConfig().uploader.upload(
       file.path,
@@ -114,9 +150,13 @@ export const coverImages = async (req, res, next) => {
 
 export const freezeAccount = async (req, res, next) => {
   const { userId } = req.params;
+  const { password } = req.body;
   if (userId && req.user.role !== roleEnum.ADMIN) {
     return next(new Error("Only admin can freeze other users' accounts"));
   }
+
+  if (!(await compareHash({ plainText: password, hash: req.user.password })))
+    return next(new Error("Invalid password ", { cause: 400 }));
 
   const updatedUser = await dbService.findOneAndUpdate({
     model: UserModel,
@@ -146,14 +186,12 @@ export const freezeAccount = async (req, res, next) => {
 };
 
 export const restoreFreezedAccount = async (req, res, next) => {
-  const { userId } = req.params;
+  const userId = req.user._id;
 
   const frozenUser = await dbService.findById({
     model: UserModel,
     id: userId,
   });
-
-  const userRequestUnfreeze = req.user;
 
   if (!frozenUser) return next(new Error("User not found"), { cause: 404 });
 
@@ -161,11 +199,11 @@ export const restoreFreezedAccount = async (req, res, next) => {
   //he will not be authorized to unfreeze it
   // user => user
   // admin => admin
-  if (!frozenUser.freezedBy.equals(userRequestUnfreeze._id)) {
+  if (!frozenUser.freezedBy.equals(userId)) {
     return next(new Error("You are not authorized to restore this account"), {
       cause: 403,
     });
-  } else if (frozenUser.freezedBy.equals(userRequestUnfreeze._id)) {
+  } else if (frozenUser.freezedBy.equals(userId)) {
     const updatedUser = await dbService.findOneAndUpdate({
       model: UserModel,
       filter: {
@@ -229,7 +267,7 @@ export const deleteAccount = async (req, res, next) => {
 };
 
 export const restoreDeletedAccount = async (req, res, next) => {
-  const { userId } = req.params;
+  const userId = req.user._id;
 
   const deletedUser = await dbService.findById({
     model: UserModel,
@@ -244,11 +282,11 @@ export const restoreDeletedAccount = async (req, res, next) => {
   //he will not be authorized to UnDelete it
   // user => user
   // admin => admin
-  if (!deletedUser.deletedBy.equals(userRequestUnDelete._id)) {
+  if (!deletedUser.deletedBy.equals(userId)) {
     return next(new Error("You are not authorized to restore this account"), {
       cause: 403,
     });
-  } else if (deletedUser.deletedBy.equals(userRequestUnDelete._id)) {
+  } else if (deletedUser.deletedBy.equals(userId)) {
     const updatedUser = await dbService.findOneAndUpdate({
       model: UserModel,
       filter: {

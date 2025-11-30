@@ -82,7 +82,7 @@ const userSchema = new mongoose.Schema(
       ref: "User",
     },
     // soft delete fields
-    isDeleted: { type: Boolean, default: false },
+
     deletedAt: {
       type: Date,
       index: {

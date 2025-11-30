@@ -1,82 +1,114 @@
 export const template = (code, firstName, subject) => `<!DOCTYPE html>
 <html>
 <head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
     body {
-      font-family: Arial, sans-serif;
+      font-family: Arial, Helvetica, sans-serif;
       margin: 0;
       padding: 0;
-      background-color: #f4f4f4;
+      background-color: #f5f6fa;
     }
+
     .email-container {
       max-width: 600px;
-      margin: 20px auto;
+      margin: 30px auto;
       background-color: #ffffff;
-      border: 1px solid #dddddd;
-      border-radius: 8px;
+      border-radius: 10px;
       overflow: hidden;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
     }
+
     .email-header {
-      background-color: #007BFF;
+      background: linear-gradient(135deg, #6a5acd, #7a6ff0);
       color: #ffffff;
       text-align: center;
-      padding: 20px;
+      padding: 25px 20px;
     }
+
     .email-header h1 {
       margin: 0;
-      font-size: 24px;
+      font-size: 26px;
+      font-weight: 600;
     }
+
     .email-body {
-      padding: 20px;
+      padding: 25px 20px;
       color: #333333;
-      line-height: 1.6;
+      line-height: 1.7;
+      font-size: 16px;
     }
+
     .email-body h2 {
       margin-top: 0;
-      color: #007BFF;
+      font-size: 20px;
+      color: #6a5acd;
     }
-    .activation-button {
+
+    .code-box {
       display: inline-block;
-      background-color: #007BFF;
+      background-color: #6a5acd;
       color: #ffffff !important;
-      text-decoration: none;
-      padding: 10px 20px;
-      border-radius: 5px;
-      font-size: 16px;
+      padding: 12px 25px;
+      font-size: 22px;
+      border-radius: 8px;
       margin: 20px 0;
+      font-weight: bold;
+      letter-spacing: 2px;
     }
-    .activation-button:hover {
-      background-color: #0056b3;
-    }
+
     .email-footer {
       text-align: center;
       padding: 15px;
-      background-color: #f4f4f4;
-      font-size: 14px;
-      color: #777777;
+      background-color: #f5f6fa;
+      font-size: 13px;
+      color: #777;
     }
+
     .email-footer a {
-      color: #007BFF;
+      color: #6a5acd;
       text-decoration: none;
+      font-weight: 500;
     }
   </style>
 </head>
+
 <body>
   <div class="email-container">
+    
     <div class="email-header">
       <h1>${subject}</h1>
     </div>
+
     <div class="email-body">
       <h2>Hello ${firstName},</h2>
-      <p>Thank you for signing up with Route Academy. To complete your registration and start using your account, please get code to activate your account:</p>
-      <h2 class="activation-button">${code}</h2>
-      <p>If you did not sign up for this account, please ignore this email.</p>
-      <p>Best regards,<br>Sara7a Application Team</p>
+
+      <p>
+        Thank you for joining <strong>TruthBox</strong>!  
+        To secure your account and complete your verification, please use the activation code below:
+      </p>
+
+      <div class="code-box">${code}</div>
+
+      <p>
+        If you didn’t request this email, you can safely ignore it.
+      </p>
+
+      <p>
+        Best regards,<br />
+        <strong>TruthBox Team</strong>
+      </p>
     </div>
+
     <div class="email-footer">
-      <p>&copy; 2024 Route Academy. All rights reserved.</p>
-      <p><a href="[SupportLink]">Contact Support</a> | <a href="[UnsubscribeLink]">Unsubscribe</a></p>
+      <p>&copy; ${new Date().getFullYear()} TruthBox. All rights reserved.</p>
+      <p>
+        <a href="[SupportLink]">Contact Support</a> |
+        <a href="[UnsubscribeLink]">Unsubscribe</a>
+      </p>
     </div>
+
   </div>
 </body>
 </html>`;

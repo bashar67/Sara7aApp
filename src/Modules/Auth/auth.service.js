@@ -20,7 +20,7 @@ export const signup = async (req, res, next) => {
       deletedAt: { $exists: false },
       freezedAt: { $exists: false },
     },
-  }); // null  or document(truthy value)
+  });
 
   if (existingUser)
     return next(new Error("User already exists", { cause: 409 }));
@@ -73,16 +73,27 @@ export const login = async (req, res, next) => {
 
   if (!existingUser.confirmEmail)
     return next(new Error("Please confirm your email first", { cause: 400 }));
-  if (existingUser.freezedAt)
-    return next(
-      new Error("Account is freezed Please unfreeze it or contact support", {
-        cause: 403,
-      })
-    );
-  if (existingUser.deletedAt)
-    return next(
-      new Error("This account is scheduled for deletion  ", { cause: 403 })
-    );
+  if (existingUser.freezedAt) {
+    const { accessToken } = await getNewLoginCredentials(existingUser);
+
+    return successResponse({
+      res,
+      statusCode: 403,
+      message: "Account is freezed Please unfreeze it or contact support",
+      data: { accessToken },
+    });
+  }
+
+  if (existingUser.deletedAt) {
+    const { accessToken } = await getNewLoginCredentials(existingUser);
+
+    return successResponse({
+      res,
+      statusCode: 403,
+      message: "This account is scheduled for deletion",
+      data: { accessToken },
+    });
+  }
 
   const credentials = await getNewLoginCredentials(existingUser);
   const user = {
@@ -248,9 +259,8 @@ export const updatePassword = async (req, res, next) => {
   });
 };
 
-export const resetPassword = async (req, res, next) => {
-  const { email, otp, password } = req.body;
-
+export const confirmResetPasswordOTP = async (req, res, next) => {
+  const { email, otp } = req.body;
   const user = await dbService.findOne({
     model: UserModel,
     filter: {
@@ -260,11 +270,6 @@ export const resetPassword = async (req, res, next) => {
       freezedAt: { $exists: false },
     },
   });
-  if (!user)
-    return next(
-      new Error("User Not Found or email not confirmed", { cause: 404 })
-    );
-
   if (
     !(await compareHash({ plainText: otp, hash: user.forgetPasswordOTP.code }))
   )
@@ -283,6 +288,30 @@ export const resetPassword = async (req, res, next) => {
 
     return next(new Error("OTP expired", { cause: 400 }));
   }
+
+  return successResponse({
+    res,
+    statusCode: 200,
+    message: "OTP confirmed successfully",
+  });
+};
+
+export const resetPassword = async (req, res, next) => {
+  const { email, password } = req.body;
+
+  const user = await dbService.findOne({
+    model: UserModel,
+    filter: {
+      email,
+      confirmEmail: { $exists: true },
+      deletedAt: { $exists: false },
+      freezedAt: { $exists: false },
+    },
+  });
+  if (!user)
+    return next(
+      new Error("User Not Found or email not confirmed", { cause: 404 })
+    );
 
   await dbService.updateOne({
     model: UserModel,
@@ -324,27 +353,42 @@ export const loginWithGmail = async (req, res, next) => {
   }
 
   const user = await dbService.findOne({ model: UserModel, filter: { email } });
-  if (existingUser.freezedAt)
-    return next(
-      new Error("Account is freezed Please unfreeze it or contact support", {
-        cause: 403,
-      })
-    );
-  if (existingUser.deletedAt)
-    return next(
-      new Error("This account is scheduled for deletion  ", { cause: 403 })
-    );
-  if (user) {
-    if (user.providers === providerEnum.GOOGLE) {
-      const credentials = await getNewLoginCredentials(existingUser);
 
-      return successResponse({
-        res,
-        statusCode: 200,
-        message: "User LoggedIn successfully",
-        data: { credentials },
-      });
+  if (user) {
+    if (user.freezedAt) {
+      return next(
+        new Error("Account is freezed. Please unfreeze or contact support", {
+          cause: 403,
+        })
+      );
     }
+    if (user.deletedAt) {
+      return next(
+        new Error("This account is scheduled for deletion", { cause: 403 })
+      );
+    }
+    // if (user.providers !== providerEnum.GOOGLE) {
+    //   return next(
+    //     new Error("This email is already registered with another provider", {
+    //       cause: 400,
+    //     })
+    //   );
+    // }
+
+    const returnedUser = {
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+      gender: user.gender,
+    };
+
+    const credentials = await getNewLoginCredentials(user);
+    return successResponse({
+      res,
+      statusCode: 200,
+      message: "User logged in successfully",
+      data: { credentials, returnedUser },
+    });
   }
 
   const newUser = await dbService.create({
@@ -352,7 +396,7 @@ export const loginWithGmail = async (req, res, next) => {
     data: [
       {
         firstName: given_name,
-        lastName: family_name,
+        lastName: family_name || "no last name",
         email,
         // profilePic: picture,
         confirmEmail: Date.now(),
@@ -361,11 +405,17 @@ export const loginWithGmail = async (req, res, next) => {
     ],
   });
   const credentials = await getNewLoginCredentials(newUser);
+  const returnedUser = {
+    firstName: newUser.firstName,
+    lastName: newUser.lastName,
+    email: newUser.email,
+    gender: newUser.gender,
+  };
 
   return successResponse({
     res,
     statusCode: 200,
     message: "Login  successfully",
-    data: { credentials },
+    data: { credentials, returnedUser },
   });
 };
