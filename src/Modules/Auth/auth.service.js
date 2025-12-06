@@ -415,7 +415,7 @@ export const loginWithGmail = async (req, res, next) => {
   return successResponse({
     res,
     statusCode: 200,
-    message: "Login  successfully",
+    message: " user created  successfully",
     data: { credentials, returnedUser },
   });
 };
